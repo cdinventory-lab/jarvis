@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jarvis"
+version = "0.1.0"
+description = "JARVIS - autonomous, local-first PC assistant (Windows-first, cross-platform development)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "JARVIS Project" }]
+keywords = ["assistant", "automation", "computer-use", "agent"]
+# JARVIS is deliberately dependency-free at its core so the brain, planner,
+# security, memory and orchestration layers can run (and be tested) anywhere.
+# Platform capabilities are opt-in extras:
+dependencies = []
+
+[project.optional-dependencies]
+# Real computer control on a machine with a display (Windows recommended).
+computer = [
+    "pyautogui>=0.9.54",
+    "psutil>=5.9",
+    "pyperclip>=1.8",
+]
+# Screen reading (OCR) - also requires the Tesseract binary on PATH.
+ocr = [
+    "Pillow>=10.0",
+    "pytesseract>=0.3.10",
+]
+# Emergency-stop global hotkey (CTRL+ALT+J).
+hotkey = ["keyboard>=0.13.5"]
+dev = [
+    "pytest>=7.4",
+    "ruff>=0.4",
+]
+
+[project.scripts]
+jarvis = "jarvis.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["jarvis*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]
+ignore = ["E501"]
