@@ -731,3 +731,41 @@
 }
 @keyframes shimmer { from { background-position: 140% 0, 0 0; } to { background-position: -60% 0, 0 0; } }
 @media (max-width: 640px) { .skeleton { height: 160px; } }
+
+/* --------------------------- artwork controls ------------------ */
+
+.art-block { border: 1px solid var(--studio-line); padding: 12px; margin: -2px 0 4px; background: rgba(255,255,255,0.02); }
+.art-block-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.art-block-head .dim { color: var(--studio-dim); }
+.ref-thumb-row { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: center; }
+.ref-thumb-row img { width: 74px; height: 74px; object-fit: cover; border: 1px solid var(--studio-line); filter: grayscale(1); }
+.ref-empty {
+  width: 74px; height: 74px;
+  display: grid; place-items: center;
+  border: 1px dashed var(--studio-line-2);
+  font-size: 9px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--studio-dim);
+  text-align: center;
+}
+.ref-thumb-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.motif-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+.motif-btn {
+  padding: 7px 8px;
+  border: 1px solid var(--studio-line);
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  color: var(--studio-dim);
+  text-align: left;
+}
+.motif-btn:hover { color: var(--studio-ink); border-color: var(--studio-line-2); }
+.motif-btn.is-active { background: var(--studio-ink); color: var(--studio-bg); border-color: var(--studio-ink); }
+.text-input {
+  width: 100%;
+  background: #1b1b1a;
+  border: 1px solid var(--studio-line);
+  padding: 8px 10px;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  color: var(--studio-ink);
+  outline: none;
+}
+.text-input:focus { border-color: var(--studio-line-2); }

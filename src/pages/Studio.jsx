@@ -4,6 +4,7 @@ import { useStudio } from '../store.jsx';
 import {
   TOOLS, TOOL_ORDER, GARMENTS, COLORWAYS, garmentById, colorwayById, sizeChart, priceEstimate,
 } from '../lib/engine.js';
+import { MOTIFS, makeArtworkSpec } from '../store.jsx';
 import { Icons, TOOL_ICONS } from '../components/Icons.jsx';
 import { ArtifactView, ArtifactActions, downloadSvg } from '../components/Artifact.jsx';
 import { LogoMark } from '../lib/Garments.jsx';
@@ -56,6 +57,21 @@ export default function Studio() {
     return () => clearTimeout(t);
   }, []);
 
+  const lastArt = useMemo(
+    () => [...messages].reverse().map((m) => m.artifact).find((a) => a && a.kind === 'art'),
+    [messages]
+  );
+
+  const setArt = (patch) => {
+    if (!lastArt) return;
+    dispatch({ type: 'patchArtifact', id: lastArt.id, patch: { art: { ...lastArt.art, ...patch } } });
+  };
+
+  const reRollArt = (motif) => {
+    if (!lastArt) return;
+    setArt({ ...makeArtworkSpec(lastArt.params.prompt || lastArt.params.brand, (lastArt.art.seed || 1) + 13, motif), seed: (lastArt.art.seed || 1) + 13 });
+  };
+
   const setControl = (patch) => {
     dispatch({ type: 'controls', payload: patch });
     const garmentKinds = ['mockup', 'photoshoot', 'video', 'techpack', 'model3d', 'sizechart', 'estimate'];
@@ -102,6 +118,9 @@ export default function Studio() {
       case 'vector':
         run('vector', artifact.params.prompt || artifact.params.brand, { mark });
         break;
+      case 'upload':
+        fileRef.current?.click();
+        break;
       case 'apply':
         if (artifact.kind === 'art') {
           run('mockup', artifact.params.prompt || artifact.params.brand, { artSpec: artifact.art });
@@ -138,11 +157,28 @@ export default function Studio() {
 
   const onFile = async (file) => {
     if (!file) return;
-    const dataUrl = await shrinkImage(file);
-    if (!dataUrl) return;
+    const result = await shrinkImage(file);
+    if (!result) return;
+    const { dataUrl, grid } = result;
     setControl({ refImage: dataUrl });
+
+    // Drop the upload straight onto an existing image-to-image card for free.
+    const latestReference = [...messages].reverse().map((m) => m.artifact)
+      .find((a) => a && a.kind === 'art' && a.art?.mode === 'reference');
+    if (latestReference) {
+      dispatch({
+        type: 'patchArtifact',
+        id: latestReference.id,
+        patch: { art: { ...latestReference.art, source: dataUrl, grid, gridSize: GRID } },
+      });
+      dispatch({ type: 'tool', payload: 'img2img' });
+      return;
+    }
+
     dispatch({ type: 'tool', payload: 'img2img' });
-    run('img2img', draft || 'Convert my reference into a one-colour print', { controls: { refImage: dataUrl } });
+    run('img2img', draft || 'Convert my reference into a one-colour print', {
+      controls: { refImage: dataUrl }, grid,
+    });
   };
 
   const send = (text) => {
@@ -286,7 +322,8 @@ export default function Studio() {
           <div className="inspector-scroll">
             {panel === 'inspect' ? (
               <Inspector controls={state.controls} setControl={setControl} tool={state.activeTool}
-                lastArtifact={lastArtifact} run={run} pendingMark={pendingMark} onFile={onFile} fileRef={fileRef} />
+                lastArtifact={lastArtifact} run={run} pendingMark={pendingMark} onFile={onFile} fileRef={fileRef}
+                lastArt={lastArt} setArt={setArt} reRollArt={reRollArt} />
             ) : (
               <DropSummary messages={messages} credits={state.credits} onReset={() => dispatch({ type: 'reset' })} />
             )}
@@ -391,9 +428,10 @@ function Field({ label, children, hint }) {
   );
 }
 
-function Inspector({ controls, setControl, tool, lastArtifact, run, pendingMark, onFile, fileRef }) {
+function Inspector({ controls, setControl, tool, lastArtifact, run, pendingMark, onFile, fileRef, lastArt, setArt, reRollArt }) {
   return (
     <div className="inspector-inner">
+      {lastArt && <ArtControls art={lastArt.art} setArt={setArt} reRoll={reRollArt} onUpload={() => fileRef.current?.click()} />}
       <div className="inspector-block">
         <p className="mono-xs dim">GARMENT</p>
         <div className="garment-grid">
@@ -513,28 +551,137 @@ function Inspector({ controls, setControl, tool, lastArtifact, run, pendingMark,
   );
 }
 
-/** Downscale uploads so reference images stay small enough to persist. */
-function shrinkImage(file, max = 900) {
+/** Grid resolution for the vectorised reference print. */
+const GRID = 84;
+
+/**
+ * Downscale the upload for the thumbnail and sample it into a luminance grid,
+ * which is what actually gets printed (as vector dots).
+ */
+function shrinkImage(file, max = 720) {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = () => {
       const img = new Image();
-      img.onload = () => {
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return resolve(String(reader.result));
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', 0.82));
+      let settled = false;
+      const fallback = () => {
+        if (settled) return;
+        settled = true;
+        resolve({ dataUrl: String(reader.result), grid: null });
       };
-      img.onerror = () => resolve(String(reader.result));
+      img.onload = () => {
+        if (settled) return;
+        try {
+          const scale = Math.min(1, max / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return fallback();
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+
+          // Square-cover sample so what we show is what we print.
+          const side = Math.min(img.width, img.height);
+          const gCanvas = document.createElement('canvas');
+          gCanvas.width = GRID;
+          gCanvas.height = GRID;
+          const gCtx = gCanvas.getContext('2d');
+          if (!gCtx) return fallback();
+          gCtx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, GRID, GRID);
+          const px = gCtx.getImageData(0, 0, GRID, GRID).data;
+          const grid = [];
+          for (let i = 0; i < px.length; i += 4) {
+            grid.push(Math.round((px[i] * 0.299 + px[i + 1] * 0.587 + px[i + 2] * 0.114) / 4) * 4);
+          }
+          settled = true;
+          resolve({ dataUrl, grid });
+        } catch {
+          fallback();
+        }
+      };
+      img.onerror = fallback;
+      setTimeout(fallback, 1800);
       img.src = String(reader.result);
     };
     reader.onerror = () => resolve(null);
     reader.readAsDataURL(file);
   });
+}
+
+function ArtControls({ art, setArt, reRoll, onUpload }) {
+  const isRef = art.mode === 'reference';
+  return (
+    <div className="inspector-block art-block">
+      <div className="art-block-head">
+        <p className="mono-xs dim">{isRef ? 'IMAGE → IMAGE' : 'TEXT → IMAGE'}</p>
+        <span className="mono-xs dim">live · free</span>
+      </div>
+      {isRef ? (
+        <>
+          <div className="ref-thumb-row">
+            {art.source ? <img src={art.source} alt="reference" /> : <div className="ref-empty">No reference</div>}
+            <div className="ref-thumb-actions">
+              <button className="mini" onClick={onUpload}>Upload</button>
+              {art.source && <button className="mini" onClick={() => setArt({ source: null, grid: null })}>Clear</button>}
+            </div>
+          </div>
+          <Field label="TONES" hint={`${art.levels ?? 5}`}>
+            <input type="range" min="2" max="8" step="1" value={art.levels ?? 5} className="range"
+              onChange={(e) => setArt({ levels: Number(e.target.value) })} />
+          </Field>
+          <Field label="CONTRAST" hint={`${(art.contrast ?? 1.6).toFixed(1)}×`}>
+            <input type="range" min="0.6" max="2.6" step="0.1" value={art.contrast ?? 1.6} className="range"
+              onChange={(e) => setArt({ contrast: Number(e.target.value) })} />
+          </Field>
+          <Field label="DOT SIZE" hint={`${(art.dot ?? 2).toFixed(1)}`}>
+            <input type="range" min="0.6" max="3.4" step="0.1" value={art.dot ?? 2} className="range"
+              onChange={(e) => setArt({ dot: Number(e.target.value) })} />
+          </Field>
+          <Field label="DOT SHAPE">
+            <div className="seg">
+              <button type="button" className={(art.halftone ?? 0.6) > 0.12 ? 'is-active' : ''}
+                onClick={() => setArt({ halftone: 0.6 })}>Round</button>
+              <button type="button" className={(art.halftone ?? 0.6) <= 0.12 ? 'is-active' : ''}
+                onClick={() => setArt({ halftone: 0 })}>Square</button>
+            </div>
+          </Field>
+          <Field label="INK">
+            <div className="seg">
+              <button type="button" className={!art.invert ? 'is-active' : ''} onClick={() => setArt({ invert: false })}>Positive</button>
+              <button type="button" className={art.invert ? 'is-active' : ''} onClick={() => setArt({ invert: true })}>Inverted</button>
+            </div>
+          </Field>
+          {!art.grid && <p className="inspector-note">Upload an image and it is vectorised into one-colour dots — printable, not a photo.</p>}
+        </>
+      ) : (
+        <>
+          <Field label="ARTWORK STYLE">
+            <div className="motif-grid">
+              {MOTIFS.map((m) => (
+                <button key={m.id} type="button" className={`motif-btn ${art.motif === m.id ? 'is-active' : ''}`}
+                  onClick={() => reRoll(m.id)}>{m.label}</button>
+              ))}
+            </div>
+          </Field>
+          <Field label="DENSITY" hint={`${art.density ?? 9}`}>
+            <input type="range" min="4" max="18" step="1" value={art.density ?? 9} className="range"
+              onChange={(e) => setArt({ density: Number(e.target.value) })} />
+          </Field>
+          <Field label="INK">
+            <div className="seg">
+              <button type="button" className={!art.invert ? 'is-active' : ''} onClick={() => setArt({ invert: false })}>Dark on light</button>
+              <button type="button" className={art.invert ? 'is-active' : ''} onClick={() => setArt({ invert: true })}>Light on dark</button>
+            </div>
+          </Field>
+          <Field label="WORD" hint="used by type styles">
+            <input className="text-input" value={art.word || ''} maxLength={9}
+              onChange={(e) => setArt({ word: e.target.value.toUpperCase() })} placeholder="JARVIS" />
+          </Field>
+        </>
+      )}
+    </div>
+  );
 }
 
 const GARMENT_GLYPH = {

@@ -14,7 +14,7 @@ export function Artwork({ spec, ink = '#111110', className = '', size, transpare
   let content = null;
   switch (spec.mode) {
     case 'reference':
-      content = <ReferenceArt spec={spec} uid={uid} />;
+      content = <ReferenceArt spec={spec} uid={uid} transparent={transparent} />;
       break;
     default:
       content = <ProceduralArt spec={spec} fg={fg} r={r} />;
@@ -139,40 +139,101 @@ function ProceduralArt({ spec, fg, r }) {
   );
 }
 
-function ReferenceArt({ spec, uid }) {
-  const filterId = `ref-${uid}`;
-  if (!spec.source) {
+function ReferenceArt({ spec, uid, transparent = false }) {
+  const { source, grid, gridSize = 84, levels = 5, contrast = 1.6, halftone = 0.6, dot = 2, invert = false } = spec;
+
+  if (!source && !grid) {
     return (
       <g>
         <rect x="24" y="24" width="352" height="352" fill="none" stroke="#111110" strokeDasharray="6 6" strokeWidth="1.5" />
-        <text x="200" y="200" textAnchor="middle" fontFamily="'Space Grotesk', Arial" fontSize="15"
+        <text x="200" y="192" textAnchor="middle" fontFamily="'Space Grotesk', Arial" fontSize="14"
           fill="#111110" letterSpacing="2">ADD A REFERENCE IMAGE</text>
+        <text x="200" y="214" textAnchor="middle" fontFamily="'Space Grotesk', Arial" fontSize="9.5"
+          fill="#111110" opacity="0.55" letterSpacing="1.6">WE VECTORISE IT INTO A 1-COLOUR PRINT</text>
       </g>
     );
   }
+
+  // Vectorised halftone — the printable artwork.
+  if (Array.isArray(grid) && grid.length) {
+    const n = Math.round(Math.sqrt(grid.length)) || gridSize;
+    const area = 360;
+    const cell = area / n;
+    const steps = Math.max(2, Math.min(8, Math.round(levels)));
+    const inkColor = invert ? '#f7f7f2' : '#111110';
+    const paperColor = invert ? '#111110' : '#f7f7f2';
+    const dotScale = 0.55 + Math.min(1, Math.max(0, (dot - 0.6) / 3.4)) * 0.95;
+    const round = halftone > 0.12;
+    const cells = [];
+
+    for (let y = 0; y < n; y++) {
+      for (let x = 0; x < n; x++) {
+        const lum = grid[y * n + x] / 255;
+        let v = Math.min(1, Math.max(0, (lum - 0.5) * contrast + 0.5));
+        v = Math.round(v * (steps - 1)) / (steps - 1);
+        // Invert swaps the ink, never the shape: light dots on a dark ground.
+        const darkness = 1 - v;
+        if (darkness < 0.06) continue;
+        const cx = 20 + cell * (x + 0.5);
+        const cy = 20 + cell * (y + 0.5);
+        if (round) {
+          const r = (cell / 2) * Math.sqrt(darkness) * dotScale;
+          if (r > 0.08) cells.push(<circle key={`${x}-${y}`} cx={cx} cy={cy} r={r} fill={inkColor} />);
+        } else {
+          const side = cell * Math.sqrt(darkness) * dotScale * 1.1;
+          cells.push(<rect key={`${x}-${y}`} x={cx - side / 2} y={cy - side / 2} width={side} height={side} fill={inkColor} />);
+        }
+      }
+    }
+
+    if (transparent) {
+      // Pressed onto a garment: dots only, no paper ground, no captions.
+      return <g shapeRendering="geometricPrecision">{cells}</g>;
+    }
+
+    return (
+      <g>
+        <rect x="20" y="20" width={area} height={area} fill={paperColor} />
+        <g shapeRendering="geometricPrecision">{cells}</g>
+        <rect x="20" y="20" width={area} height={area} fill="none" stroke="#111110" strokeWidth="1.2" opacity="0.5" />
+        <text x="24" y="390" fontFamily="'Space Grotesk', Arial" fontSize="9" fill="#111110" letterSpacing="1.7" opacity="0.7">
+          {`${steps} TONES · ${round ? 'HALFTONE' : 'POSTERISED'}${invert ? ' · INVERTED' : ''}`}
+        </text>
+        <text x="376" y="390" textAnchor="end" fontFamily="'Space Grotesk', Arial" fontSize="9" fill="#111110" letterSpacing="1.7" opacity="0.7">
+          VECTORISED · 1 COLOUR
+        </text>
+      </g>
+    );
+  }
+
+  // Fallback: the raw reference, tone-separated (before a grid is sampled).
+  const filterId = `ref-${uid}`;
+  const steps = Math.max(2, Math.min(8, Math.round(levels)));
+  const table = Array.from({ length: steps }, (_, i) => (invert ? 1 - i / (steps - 1) : i / (steps - 1)).toFixed(3)).join(' ');
   return (
     <g>
       <defs>
-        <filter id={filterId}>
+        <filter id={filterId} x="0" y="0" width="100%" height="100%">
           <feColorMatrix type="saturate" values="0" />
           <feComponentTransfer>
-            <feFuncR type="linear" slope={1.7} intercept={-0.35} />
-            <feFuncG type="linear" slope={1.7} intercept={-0.35} />
-            <feFuncB type="linear" slope={1.7} intercept={-0.35} />
+            <feFuncR type="linear" slope={contrast} intercept={(1 - contrast) / 2} />
+            <feFuncG type="linear" slope={contrast} intercept={(1 - contrast) / 2} />
+            <feFuncB type="linear" slope={contrast} intercept={(1 - contrast) / 2} />
+          </feComponentTransfer>
+          <feComponentTransfer>
+            <feFuncR type="discrete" tableValues={table} />
+            <feFuncG type="discrete" tableValues={table} />
+            <feFuncB type="discrete" tableValues={table} />
           </feComponentTransfer>
         </filter>
-        <pattern id={`h-${uid}`} width="5" height="5" patternUnits="userSpaceOnUse">
-          <circle cx="2.5" cy="2.5" r="1.7" fill="#111110" opacity={0.35 + spec.halftone * 0.6} />
-        </pattern>
       </defs>
-      <image href={spec.source} x="20" y="20" width="360" height="360" preserveAspectRatio="xMidYMid slice"
+      <image href={source} x="20" y="20" width="360" height="360" preserveAspectRatio="xMidYMid slice"
         filter={`url(#${filterId})`} />
-      {spec.halftone > 0.05 && (
-        <rect x="20" y="20" width="360" height="360" fill={`url(#h-${uid})`} style={{ mixBlendMode: 'multiply' }} />
-      )}
-      <rect x="20" y="20" width="360" height="360" fill="none" stroke="#111110" strokeWidth="1.5" />
-      <text x="200" y="392" textAnchor="middle" fontFamily="'Space Grotesk', Arial" fontSize="10"
-        fill="#111110" letterSpacing="2.4">REFERENCE · 1 COLOUR CONVERSION</text>
+      <rect x="20" y="20" width="360" height="360" fill="none" stroke="#111110" strokeWidth="1.2" opacity="0.5" />
+      <text x="24" y="390" fontFamily="'Space Grotesk', Arial" fontSize="9" fill="#111110" letterSpacing="1.7" opacity="0.7">
+        {`${steps} TONES · PREVIEW`}
+      </text>
     </g>
   );
 }
+

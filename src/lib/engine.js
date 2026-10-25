@@ -75,8 +75,8 @@ export const MODEL_PHOTOS = [
 ];
 
 export const TOOLS = {
-  text2img: { id: 'text2img', name: 'Text to image', cost: 2, label: 'Text → Image', blurb: 'Any visual, from a sentence.' },
-  img2img: { id: 'img2img', name: 'Image to image', cost: 4, label: 'Image → Image', blurb: 'Restyle a reference into a print.' },
+  text2img: { id: 'text2img', name: 'Text to image', cost: 2, label: 'Text → Image', blurb: 'Eight print styles from one sentence.' },
+  img2img: { id: 'img2img', name: 'Image to image', cost: 4, label: 'Image → Image', blurb: 'Vectorise any photo into a one-colour print.' },
   mockup: { id: 'mockup', name: 'Technical mockup', cost: 2, label: 'Mockup', blurb: 'Garment mockups, flat or worn.' },
   logo: { id: 'logo', name: 'Logo & graphics', cost: 3, label: 'Logo', blurb: 'Marks, badges and wordmarks.' },
   photoshoot: { id: 'photoshoot', name: 'Photoshoot', cost: 3, label: 'Photoshoot', blurb: 'Your print on a model.' },

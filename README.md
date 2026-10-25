@@ -45,8 +45,8 @@ Three-column dark workspace:
 
 | Tool | Cost | Output |
 | --- | --- | --- |
-| Text → Image | 2 | One-colour print artwork (halftone, stripes, arch, checker, brutalist type, orbit, gradient) |
-| Image → Image | 4 | Your uploaded reference converted to a one-colour print and pressed onto a garment |
+| Text → Image | 2 | One-colour print artwork in 8 styles (halftone, type stack, stripes, arches, checker, brutalist, orbit, gradient) with live density / ink / word controls |
+| Image → Image | 4 | Upload a photo; it is **vectorised** into one-colour dots (tones, contrast, dot size/shape, invert) and can be pressed onto any garment |
 | Mockup | 2 | Technical garment flat: 8 garments × 6 colourways, front/back/sleeve placement |
 | Logo | 3 | 4 marks per run across 8 styles (wordmark, monogram, badge, seal, gothic, emblem, minimal, brutal) |
 | Photoshoot | 3 | Print composited onto model photography in the correct tonal blend |
@@ -56,6 +56,12 @@ Three-column dark workspace:
 | Size chart | 1 | XS–XXL in cm or inches, fit-aware, CSV export |
 | Price estimate | 1 | Unit cost + order total + cost breakdown, recalculated live by quantity |
 | 3D model | 20 | Drag-to-spin turntable with wireframe toggle, `.glb` framing |
+
+### Image → image, honestly vectorised
+Uploads are sampled into an 84 × 84 luminance grid in the browser, then re-drawn as
+one-colour dots (circle or square, 2–8 tone separations). The result is real vector geometry:
+it scales, exports as SVG, presses onto light or dark garments, and never depends on the
+uploaded bitmap loading at render time.
 
 ### Design system
 Strictly black and white: ink `#0b0b0a`, paper `#f4f3ef`, plus a monochrome studio palette.

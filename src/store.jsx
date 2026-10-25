@@ -116,7 +116,7 @@ export function StudioProvider({ children }) {
       return id;
     };
 
-    const buildArtifact = (tool, prompt, controls, prevMark, overrideSeed, artSpec) => {
+    const buildArtifact = (tool, prompt, controls, prevMark, overrideSeed, artSpec, grid) => {
       const brief = parseBrief(prompt || '');
       const brand = detectBrandExplicit(prompt || '') || state.brand || brief.brand || 'JARVIS';
       const p = {
@@ -158,7 +158,7 @@ export function StudioProvider({ children }) {
           return {
             kind: 'art', tool, title: 'Reference → print',
             params: p,
-            art: { mode: 'reference', source: controls.refImage, threshold: 0.5, halftone: 0.4 },
+            art: makeReferenceSpec(controls.refImage || null, grid || null),
             appliedTo: null,
             ink,
           };
@@ -221,7 +221,7 @@ export function StudioProvider({ children }) {
       dispatch({ type: 'thinking', payload: { tool, prompt } });
       const delay = opts.instant ? 0 : t.cost >= 20 ? 2100 : 900 + Math.min(900, t.cost * 60);
       const id = setTimeout(() => {
-        const artifact = buildArtifact(tool, prompt, controls, prevMark, seed, opts.artSpec || null);
+        const artifact = buildArtifact(tool, prompt, controls, prevMark, seed, opts.artSpec || null, opts.grid || null);
         const text = assistantCopy(tool, artifact, prompt);
         dispatch({ type: 'thinking', payload: null });
         pushAssistant(text, artifact, t.cost);
@@ -247,7 +247,7 @@ export function StudioProvider({ children }) {
       const tool = intent.tool || state.activeTool;
 
       // Refinement of an existing artifact
-      if (intent.refine && last && !intent.tool) {
+      if (intent.refine && last && !intent.explicit) {
         const { next, changed } = parseRefine(text, last);
         if (changed) {
           const t = TOOLS[last.tool] || TOOLS.mockup;
@@ -308,22 +308,37 @@ function detectIntent(text = '') {
   if (/^\s*(hi|hello|hey)\b/.test(p)) return { small: true };
   if (/credit|how much|balance/.test(p)) out.credits = true;
   if (/bigger|smaller|washed|cleaner|invert|move (it )?to|back graphic|chest|sleeve|bolder|thinner|tagline/.test(p)) out.refine = true;
+
+  const garmentHit = /hoodie|tee\b|t-?shirt|crewneck|sweatshirt|bomber|jacket|cargo|pants|shorts|cap\b|garment/.test(p);
+  const artworkHit = /artwork|graphic|motif|poster|pattern|print|illustration|design for/.test(p);
+
   const map = [
     [/tech ?pack|spec sheet|bom/, 'techpack'],
     [/size chart|sizing|measurements/, 'sizechart'],
     [/price|cost|estimate|budget|quote/, 'estimate'],
-    [/3d|rotate|glb/, 'model3d'],
-    [/vector|svg|line art|embroidery file/, 'vector'],
+    [/3d model|\b3d\b|rotate|glb/, 'model3d'],
+    [/vector|svg\b|line art|embroidery file/, 'vector'],
     [/video|reel|tiktok|loop|animate/, 'video'],
-    [/photoshoot|on a model|model|lookbook|campaign/, 'photoshoot'],
-    [/image to image|img2img|reference|upload|my photo|this photo/, 'img2img'],
-    [/logo|mark|monogram|wordmark|badge|brand identity/, 'logo'],
-    [/text to image|text2img|artwork|graphic|print design|pattern/, 'text2img'],
-    [/mockup|hoodie|tee|t-shirt|crewneck|bomber|cargo|shorts|cap|garment/, 'mockup'],
+    [/photoshoot|on a model|lookbook|campaign|model shot/, 'photoshoot'],
+    [/image to image|img2img|reference|upload|my photo|this photo|this image/, 'img2img'],
+    [/logo|\bmark\b|monogram|wordmark|badge|brand identity|branding/, 'logo'],
+    [/text to image|text2img/, 'text2img'],
+    [null, null],
   ];
   map.forEach(([re, tool]) => {
-    if (re.test(p) && !out.tool) out.tool = tool;
+    if (re && re.test(p) && !out.explicit) {
+      out.tool = tool;
+      out.explicit = true;
+    }
   });
+  if (!out.tool) {
+    if (garmentHit) out.tool = 'mockup';
+    else if (artworkHit) out.tool = 'text2img';
+  }
+  // "cleaner print", "bigger back graphic" are edits, not new briefs.
+  if (out.refine && !out.explicit && /^(make|move|change|clean|invert|swap|scale|keep|use|add|remove|smaller|bigger|bolder|thinner|more|less|slightly|turn)/.test(p.trim())) {
+    out.tool = null;
+  }
   return out;
 }
 
@@ -371,20 +386,61 @@ function assistantCopy(tool, artifact, prompt) {
 
 /* ---------------- procedural print artwork (text → image) -------- */
 
-const MOTIFS = ['halftone', 'stripes', 'arch', 'checker', 'brutal', 'orbit', 'type', 'gradient'];
+export const MOTIFS = [
+  { id: 'halftone', label: 'Halftone' },
+  { id: 'type', label: 'Type stack' },
+  { id: 'stripes', label: 'Stripes' },
+  { id: 'arch', label: 'Arches' },
+  { id: 'checker', label: 'Checker' },
+  { id: 'brutal', label: 'Brutalist' },
+  { id: 'orbit', label: 'Orbit' },
+  { id: 'gradient', label: 'Gradient' },
+];
 
-export function makeArtworkSpec(prompt = '', seed = 1) {
-  const h = hashString(prompt.toLowerCase() + seed);
-  const r = (n) => (h % n);
-  const motif = MOTIFS[(h >>> 3) % MOTIFS.length];
+const MOTIF_WORDS = [
+  [/halftone|dot matrix|dots/, 'halftone'],
+  [/stripes?|lined|rules|pinstripe/, 'stripes'],
+  [/arch|column|portal|window/, 'arch'],
+  [/check|chequer|grid|graph/, 'checker'],
+  [/type|typograph|serif|word|letter|text/, 'type'],
+  [/orbit|ring|circle|radial|solar/, 'orbit'],
+  [/gradient|fade|fog|shadow|ombre/, 'gradient'],
+  [/brutal|block|bold|heavy|poster/, 'brutal'],
+];
+
+export function makeArtworkSpec(prompt = '', seed = 1, style = null) {
+  const p = (prompt || '').toLowerCase();
+  const h = hashString(p + seed);
+  const detected = (MOTIF_WORDS.find(([re]) => re.test(p)) || [])[1];
+  const motif = style || detected || MOTIFS[h % MOTIFS.length].id;
+  const words = (prompt.match(/\b([A-Za-z]{3,10})\b/g) || []).filter((w) => !/^(the|and|for|with|big|small|print)$/i.test(w));
   return {
     mode: 'procedural',
     motif,
     seed: h,
-    rotation: r(30) - 15,
-    density: 6 + (r(9)),
-    invert: (h >>> 5) % 2 === 0,
-    word: (prompt.match(/\b([A-Za-z]{3,10})\b/g) || ['JARVIS'])[r(3)]?.toUpperCase() || 'JARVIS',
+    rotation: (h % 30) - 15,
+    density: 6 + ((h >>> 3) % 9),
+    invert: ((h >>> 5) % 2) === 0,
+    word: (words[0] || 'JARVIS').toUpperCase().slice(0, 9),
+  };
+}
+
+/**
+ * A reference photo becomes a *vector* print: a luminance grid sampled from the
+ * upload, rendered as one-colour dots. No bitmaps, so it presses onto any
+ * colourway, exports as SVG and never depends on the image loading.
+ */
+export function makeReferenceSpec(source, grid = null, gridSize = 84) {
+  return {
+    mode: 'reference',
+    source,
+    grid,
+    gridSize,
+    levels: 5,
+    contrast: 1.6,
+    halftone: 0.6,
+    dot: 2,
+    invert: false,
   };
 }
 

@@ -369,8 +369,8 @@ function Tools({ marks }) {
     { id: 'model3d', title: '3D generation', body: 'Spin-ready models you can embed on your store page.', art: <div className="spin3d"><GarmentMockup garment="hoodie" colorway="ink" mark={marks[2]} placement="chest" scale="medium" /></div> },
     { id: 'estimate', title: 'Price estimates', body: 'Know your unit cost before you call a factory.', art: <div className="tool-mini-est"><span>$/pc</span><strong>$14–19</strong><span className="mono-xs dim">300 pcs · EU</span></div> },
     { id: 'sizechart', title: 'Size charts', body: 'Professional charts in cm or inches, any fit.', art: <MiniChart /> },
-    { id: 'img2img', title: 'Image to image', body: 'Turn a reference into a one-colour print and press it on a garment.', art: <Artwork spec={{ mode: 'procedural', motif: 'halftone', seed: 991, density: 13, invert: false, word: 'MONO', rotation: 0 }} /> },
-    { id: 'text2img', title: 'Text to image', body: 'Print artwork generated from a sentence, ready for the screen.', art: <Artwork spec={{ mode: 'procedural', motif: 'brutal', seed: 88, density: 8, invert: true, word: 'SAINT', rotation: 0 }} /> },
+    { id: 'img2img', title: 'Image to image', body: 'Upload a photo or screenshot — JARVIS vectorises it into one-colour dots you can print.', art: <Artwork spec={{ mode: 'procedural', motif: 'halftone', seed: 991, density: 13, invert: false, word: 'MONO', rotation: 0 }} /> },
+    { id: 'text2img', title: 'Text to image', body: 'Eight print styles — halftone, brutalist type, arches, orbits — from one sentence.', art: <Artwork spec={{ mode: 'procedural', motif: 'brutal', seed: 88, density: 8, invert: true, word: 'SAINT', rotation: 0 }} /> },
   ];
   const filtered = tab === 'all' ? items : items.filter((i) => i.id === tab);
 

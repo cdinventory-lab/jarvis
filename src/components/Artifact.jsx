@@ -392,7 +392,11 @@ export function ArtifactActions({ artifact, onAction, showRefine }) {
   } else if (artifact.kind === 'photoshoot') {
     common.push({ id: 'video', label: 'Make a 5s video' }, { id: 'vector', label: 'Vectorise print' });
   } else if (artifact.kind === 'art') {
-    common.push({ id: 'apply', label: 'Apply to garment' }, { id: 'logo', label: 'Turn into a mark' });
+    if (artifact.art?.mode === 'reference' && !artifact.art.source) {
+      common.push({ id: 'upload', label: 'Choose reference image' });
+    } else {
+      common.push({ id: 'apply', label: 'Apply to garment' }, { id: 'logo', label: 'Turn into a mark' });
+    }
   } else if (artifact.kind === 'techpack') {
     common.push({ id: 'estimate', label: 'Price it' }, { id: 'sizechart', label: 'Size chart' });
   } else if (artifact.kind === 'model3d') {
