@@ -769,3 +769,40 @@
   outline: none;
 }
 .text-input:focus { border-color: var(--studio-line-2); }
+
+/* -------------------------- pro gating + exports ---------------- */
+
+.rail-tool.is-gated span { opacity: 0.85; }
+.rail-tool.is-gated em {
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  border: 1px solid var(--studio-line-2);
+  padding: 1px 4px;
+  opacity: 0.9;
+}
+.chip.is-locked { border-style: dashed; color: var(--studio-dim); }
+.chip.is-locked::after { content: '·'; margin-left: 2px; opacity: 0; }
+
+.turntable-offscreen {
+  position: absolute;
+  width: 1px; height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+  left: -9999px;
+  top: 0;
+}
+.tp-pdf { margin-top: 8px; }
+.tp-construction { display: grid; gap: 6px; }
+.tp-construction ol { display: grid; gap: 4px; counter-reset: c; }
+.tp-construction li {
+  display: grid;
+  grid-template-columns: 20px 1fr;
+  gap: 6px;
+  font-size: 10px;
+  line-height: 1.45;
+  color: rgba(0, 0, 0, 0.72);
+  border-bottom: 1px dotted rgba(0, 0, 0, 0.12);
+  padding-bottom: 3px;
+}
+.tp-callout { color: rgba(0, 0, 0, 0.42); font-size: 8.5px; }

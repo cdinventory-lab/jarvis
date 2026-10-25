@@ -179,7 +179,15 @@ export function StudioProvider({ children }) {
         }
         case 'techpack': {
           const mark = prevMark || makeLogo({ seed: p.seed, brand, ink, style: 'monogram' });
-          return { kind: 'techpack', tool, title: 'Tech pack', params: p, mark, ink };
+          return {
+            kind: 'techpack', tool, title: 'Tech pack',
+            params: {
+              ...p,
+              colourways: [colorwayById(p.colorway).name, 'Bone', 'Heather grey'],
+              construction: CONSTRUCTION[p.garment] || CONSTRUCTION.tee,
+            },
+            mark, ink,
+          };
         }
         case 'sizechart':
           return { kind: 'sizechart', tool, title: 'Size chart', params: p, chart: sizeChart(p.garment, p.fit, p.unit) };
@@ -206,6 +214,13 @@ export function StudioProvider({ children }) {
 
     const run = (tool, prompt, opts = {}) => {
       const t = TOOLS[tool];
+      if (t.proOnly && state.plan !== 'Professional') {
+        pushAssistant(
+          'Photoshoot video is part of the Professional plan — it renders a 5-second 9:16 loop at 1080p. Switch plan in the header to unlock it; everything else stays available.',
+          null, 0
+        );
+        return;
+      }
       if (state.credits < t.cost) {
         pushAssistant(
           `You need ${t.cost} credits for that and you have ${state.credits} left. Top up in Plans and I will pick this straight back up.`,
@@ -260,6 +275,9 @@ export function StudioProvider({ children }) {
             ...last.params,
             ...next,
           };
+          if (last.kind === 'techpack' && next.garment) {
+            patched.construction = CONSTRUCTION[next.garment] || CONSTRUCTION.tee;
+          }
           dispatch({
             type: 'patchArtifact',
             id: last.id,
@@ -385,6 +403,43 @@ function assistantCopy(tool, artifact, prompt) {
 }
 
 /* ---------------- procedural print artwork (text → image) -------- */
+
+const CONSTRUCTION = {
+  hoodie: [
+    'Coverstitched hem and cuffs, 6 mm',
+    'Twin-needle shoulder seams with cotton tape',
+    'Double-layer hood with flat drawcord',
+    'Bartack at kangaroo pocket corners',
+    'Screen print cured at 160 °C',
+  ],
+  tee: [
+    'Ribbed collar, 2×1, single needle top-stitch',
+    'Taped neck and shoulder seams',
+    'Double-needle hem, 25 mm',
+    'Screen print with water-based ink, cured 160 °C',
+  ],
+  crew: [
+    'Ribbed neckband, cuffs and hem',
+    'Twin-needle raglan seams',
+    'Coverstitched armholes',
+    'Screen print cured at 160 °C',
+  ],
+  bomber: [
+    'Ribbed collar, cuffs and hem band',
+    'YKK zip with storm flap',
+    'Quilted lining, twin-needle top-stitch',
+    'Chenille patch appliqué',
+  ],
+  longsleeve: [
+    'Ribbed neckband and cuffs',
+    'Twin-needle shoulder and side seams',
+    'Double-needle hem',
+    'Screen print cured at 160 °C',
+  ],
+  cargo: ['Bar-tacked pocket mouths', 'Flat-felled side seams', 'Elastic waistband with drawcord', 'Double-needle hems'],
+  shorts: ['Flat-felled seams', 'Raw hem finish', 'Elastic waistband with drawcord', 'Bar-tacked pocket corners'],
+  cap: ['Six-panel crown, eyelets', 'Pre-curved brim, 8-row stitching', 'Adjustable metal buckle', 'Embroidered front panel'],
+};
 
 export const MOTIFS = [
   { id: 'halftone', label: 'Halftone' },

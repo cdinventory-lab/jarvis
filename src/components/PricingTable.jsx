@@ -13,16 +13,19 @@ export const PLANS = [
   {
     id: 'Creator', name: 'Creator', price: 19, annual: 15.25, credits: 225, yearCredits: 2700,
     blurb: 'For creators building a first drop.', popular: true,
-    features: ['225 credits / month', 'All 11 tools', 'Tech pack + size chart export', 'Photoshoot video', 'Priority queue'],
+    features: ['225 credits / month', 'All 11 tools', 'Tech pack + size chart export', 'PDF + SVG exports', 'Priority queue'],
   },
   {
     id: 'Professional', name: 'Professional', price: 49, annual: 39.25, credits: 810, yearCredits: 9720,
     blurb: 'For labels shipping collections.',
-    features: ['810 credits / month', 'Everything in Creator', '3D models (.glb)', 'Batch variations', 'Shared team projects'],
+    features: ['810 credits / month', 'Everything in Creator', 'Photoshoot video (9:16 · 1080p)', '3D models (.glb)', 'Batch variations', 'Shared team projects'],
   },
 ];
 
-const COSTS = TOOL_ORDER.filter((t) => TOOLS[t]).map((t) => [TOOLS[t].label, TOOLS[t].cost]);
+const COSTS = TOOL_ORDER.filter((t) => TOOLS[t]).map((t) => [
+  TOOLS[t].proOnly ? `${TOOLS[t].label} (Pro)` : TOOLS[t].label,
+  TOOLS[t].cost,
+]);
 
 export default function PricingTable({ compact = false }) {
   const [annual, setAnnual] = useState(true);

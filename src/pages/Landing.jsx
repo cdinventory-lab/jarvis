@@ -361,14 +361,21 @@ function renderStage(key, marks) {
 function Tools({ marks }) {
   const [tab, setTab] = useState('all');
   const items = [
-    { id: 'mockup', title: 'AI mockups', body: 'Any garment, flat or worn, from a sentence or a reference photo.', art: <GarmentMockup garment="crew" colorway="washed-black" mark={marks[3]} placement="chest" scale="large" wash={0.2} /> },
+    { id: 'mockup', title: 'AI mockups', body: 'Photoreal-style mockups of any garment from a sentence or a reference photo.', art: <GarmentMockup garment="crew" colorway="washed-black" mark={marks[3]} placement="chest" scale="large" wash={0.2} /> },
     { id: 'logo', title: 'Logo design', body: 'Wordmarks, monograms, badges and seals — one colour, vector.', art: <LogoMark mark={marks[1]} size={220} wash={0.08} /> },
-    { id: 'photoshoot', title: 'Photoshoots', body: 'Your print on a model, studio-lit, then animated into a loop.', art: <img src="/assets/model-1.jpg" alt="Model in a generated tee" /> },
-    { id: 'vector', title: 'Vector graphics', body: 'Clean line art for embroidery and screen printing.', art: <VectorArt mark={marks[4]} size={220} /> },
-    { id: 'techpack', title: 'Tech packs', body: 'Manufacturer-ready spec sheets with BOM and measurements.', art: <TechDrawing garment="hoodie" showNotes printMark={marks[0]} /> },
-    { id: 'model3d', title: '3D generation', body: 'Spin-ready models you can embed on your store page.', art: <div className="spin3d"><GarmentMockup garment="hoodie" colorway="ink" mark={marks[2]} placement="chest" scale="medium" /></div> },
+    { id: 'photoshoot', title: 'Photoshoots', body: 'Your design on realistic models, in the poses you choose.', art: <img src="/assets/model-1.jpg" alt="Model in a generated tee" /> },
+    { id: 'video', title: 'Photoshoot video', body: 'Animates the model into a 5-second 9:16 clip at 1080p for Reels and TikTok. Professional plan.', art: (
+      <div className="tool-video">
+        <img src="/assets/model-2.jpg" alt="Photoshoot video preview" />
+        <span className="tool-video-badge mono-xs">9:16 · 1080p · 5s</span>
+        <span className="tool-video-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5l11 7-11 7z" fill="currentColor" /></svg></span>
+      </div>
+    ) },
+    { id: 'vector', title: 'Vector graphics', body: 'Clean line art for embroidery, screen printing and pattern makers — SVG, PNG or PDF.', art: <VectorArt mark={marks[4]} size={220} /> },
+    { id: 'techpack', title: 'Tech packs', body: 'Manufacturer-ready sheets: fabric, GSM, colourways, print methods, construction callouts.', art: <TechDrawing garment="hoodie" showNotes printMark={marks[0]} /> },
+    { id: 'model3d', title: '3D generation', body: 'Turns a 2D mockup into a .glb you can rotate and embed on your storefront.', art: <div className="spin3d"><GarmentMockup garment="hoodie" colorway="ink" mark={marks[2]} placement="chest" scale="medium" /></div> },
     { id: 'estimate', title: 'Price estimates', body: 'Know your unit cost before you call a factory.', art: <div className="tool-mini-est"><span>$/pc</span><strong>$14–19</strong><span className="mono-xs dim">300 pcs · EU</span></div> },
-    { id: 'sizechart', title: 'Size charts', body: 'Professional charts in cm or inches, any fit.', art: <MiniChart /> },
+    { id: 'sizechart', title: 'Size charts', body: 'Fit and measurement tables in cm or inches for slim, regular, boxy or oversized fits.', art: <MiniChart /> },
     { id: 'img2img', title: 'Image to image', body: 'Upload a photo or screenshot — JARVIS vectorises it into one-colour dots you can print.', art: <Artwork spec={{ mode: 'procedural', motif: 'halftone', seed: 991, density: 13, invert: false, word: 'MONO', rotation: 0 }} /> },
     { id: 'text2img', title: 'Text to image', body: 'Eight print styles — halftone, brutalist type, arches, orbits — from one sentence.', art: <Artwork spec={{ mode: 'procedural', motif: 'brutal', seed: 88, density: 8, invert: true, word: 'SAINT', rotation: 0 }} /> },
   ];

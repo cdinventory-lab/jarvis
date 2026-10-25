@@ -80,7 +80,7 @@ export const TOOLS = {
   mockup: { id: 'mockup', name: 'Technical mockup', cost: 2, label: 'Mockup', blurb: 'Garment mockups, flat or worn.' },
   logo: { id: 'logo', name: 'Logo & graphics', cost: 3, label: 'Logo', blurb: 'Marks, badges and wordmarks.' },
   photoshoot: { id: 'photoshoot', name: 'Photoshoot', cost: 3, label: 'Photoshoot', blurb: 'Your print on a model.' },
-  video: { id: 'video', name: 'Photoshoot video', cost: 25, label: 'Video', blurb: 'A 5-second loop for Reels.' },
+  video: { id: 'video', name: 'Photoshoot video', cost: 25, label: 'Video', blurb: '5-second 9:16 loop for Reels.', proOnly: true },
   vector: { id: 'vector', name: 'Vector generator', cost: 3, label: 'Vector', blurb: 'Screen-print ready line art.' },
   techpack: { id: 'techpack', name: 'Tech pack', cost: 3, label: 'Tech pack', blurb: 'Manufacturer-ready spec sheet.' },
   sizechart: { id: 'sizechart', name: 'Size chart', cost: 1, label: 'Size chart', blurb: 'Measurements in cm or inches.' },

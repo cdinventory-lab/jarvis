@@ -50,12 +50,31 @@ Three-column dark workspace:
 | Mockup | 2 | Technical garment flat: 8 garments × 6 colourways, front/back/sleeve placement |
 | Logo | 3 | 4 marks per run across 8 styles (wordmark, monogram, badge, seal, gothic, emblem, minimal, brutal) |
 | Photoshoot | 3 | Print composited onto model photography in the correct tonal blend |
-| Photoshoot video | 25 | Animated 9:16 loop with live progress UI |
-| Vector | 3 | Screen-print / embroidery line art, SVG export |
-| Tech pack | 3 | A4 spec sheet: BOM, construction notes, fabric, GSM, measurement chart |
-| Size chart | 1 | XS–XXL in cm or inches, fit-aware, CSV export |
+| Photoshoot video | 25 | Animated 9:16 · 1080p · 5s loop with live progress UI — **Professional plan only** |
+| Vector | 3 | Screen-print / embroidery line art — exports **SVG, PNG or PDF** |
+| Tech pack | 3 | Fabric, GSM, colourways, print method, construction callouts, BOM, measurements — **A4 PDF export** |
+| Size chart | 1 | XS–XXL in cm or inches for slim / regular / boxy / oversized fits, CSV export |
 | Price estimate | 1 | Unit cost + order total + cost breakdown, recalculated live by quantity |
-| 3D model | 20 | Drag-to-spin turntable with wireframe toggle, `.glb` framing |
+| 3D model | 20 | Drag-to-spin turntable + **real `.glb` download** (glTF 2.0, textured garment mesh) |
+
+### Feature map
+
+| Requested capability | Where it lives |
+| --- | --- |
+| Logo design (print-ready badges, distressed monograms) | `logo` tool — 8 mark styles, 4 per run, SVG/PNG/PDF export |
+| Vector graphics (SVG / PNG / PDF) | `vector` tool — one-colour line art, all three formats |
+| AI mockups from text or reference photo | `mockup` tool + `img2img` (reference → vector print → garment) |
+| 3D generation → `.glb`, embeddable | `model3d` tool — real glTF 2.0 binary export (`src/lib/glb.js`) |
+| Photoshoots on realistic models, multiple poses | `photoshoot` tool — 3 model/pose presets, tone-matched print |
+| Photoshoot video, 5s, 9:16, 1080p (Pro only) | `video` tool, gated to the Professional plan |
+| Tech packs: fabric, GSM, colourways, print methods, construction | `techpack` tool — with A4 PDF export |
+| Size charts in cm/in for any fit | `sizechart` tool — slim / regular / boxy / oversized |
+
+### Exports are real files, not screenshots
+- **SVG** — serialised from the live DOM, one colour, infinitely scalable.
+- **PNG** — rasterised client-side at 2× through canvas.
+- **PDF** — a hand-written PDF 1.4 writer (`src/lib/glb.js`) wrapping a `DCTDecode` JPEG, A4-fitted. Verified with `pypdf` and rasterised with `pdfium` in CI-style checks.
+- **GLB** — the garment silhouette is sampled from its SVG path, ear-clipped into a triangulated prism and packed as a glTF 2.0 binary with the mockup as its base-colour texture. Verified with a round-trip parser (`validateGlb`) across all 8 garments.
 
 ### Image → image, honestly vectorised
 Uploads are sampled into an 84 × 84 luminance grid in the browser, then re-drawn as

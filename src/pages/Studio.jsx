@@ -230,11 +230,13 @@ export default function Studio() {
             {TOOL_ORDER.map((id) => {
               const Icon = TOOL_ICONS[id];
               return (
-                <button key={id} type="button" className={`rail-tool ${state.activeTool === id ? 'is-active' : ''}`}
-                  onClick={() => onTool(id)}>
+                <button key={id} type="button"
+                  className={`rail-tool ${state.activeTool === id ? 'is-active' : ''} ${TOOLS[id].proOnly && state.plan !== 'Professional' ? 'is-gated' : ''}`}
+                  onClick={() => onTool(id)}
+                  title={TOOLS[id].proOnly && state.plan !== 'Professional' ? 'Professional plan only' : TOOLS[id].blurb}>
                   <Icon />
                   <span>{TOOLS[id].label}</span>
-                  <em>{TOOLS[id].cost}</em>
+                  <em>{TOOLS[id].proOnly && state.plan !== 'Professional' ? 'PRO' : TOOLS[id].cost}</em>
                 </button>
               );
             })}
@@ -293,7 +295,8 @@ export default function Studio() {
                         <ArtifactView artifact={m.artifact}
                           onSelectMark={(i) => dispatch({ type: 'patchArtifact', id: m.artifact.id, patch: { selected: i } })}
                           onAction={(a) => handleAction(m.artifact, a)} />
-                        <ArtifactActions artifact={m.artifact} onAction={(a) => handleAction(m.artifact, a)} showRefine />
+                        <ArtifactActions artifact={m.artifact} onAction={(a) => handleAction(m.artifact, a)} showRefine
+                          pro={state.plan === 'Professional'} />
                       </div>
                     </div>
                   </div>
@@ -380,7 +383,9 @@ function Composer({ draft, setDraft, send, tool, credits, onFile, fileRef }) {
     <div className="composer-wrap">
       <div className="composer">
         <div className="composer-tools">
-          <span className="composer-tool mono-xs"><Icons.spark size={14} /> {TOOLS[tool].label} · {TOOLS[tool].cost} cr</span>
+          <span className="composer-tool mono-xs">
+            <Icons.spark size={14} /> {TOOLS[tool].label} · {TOOLS[tool].proOnly ? 'Professional only' : `${TOOLS[tool].cost} cr`}
+          </span>
           <span className="composer-chips">
             {prompts.slice(0, 2).map((p) => (
               <button key={p} type="button" className="chip chip-ghost" onClick={() => setDraft(p)}>{p}</button>
@@ -481,7 +486,7 @@ function Inspector({ controls, setControl, tool, lastArtifact, run, pendingMark,
 
         <Field label="FIT">
           <div className="seg">
-            {['regular', 'boxy', 'oversized'].map((f) => (
+            {['slim', 'regular', 'boxy', 'oversized'].map((f) => (
               <button key={f} type="button" className={controls.fit === f ? 'is-active' : ''}
                 onClick={() => setControl({ fit: f })}>{f}</button>
             ))}
@@ -541,7 +546,7 @@ function Inspector({ controls, setControl, tool, lastArtifact, run, pendingMark,
             <button key={t} className="run-btn" type="button"
               onClick={() => run(t, lastArtifact?.params?.prompt || controls.prompt || 'Continue the drop', { mark: pendingMark || lastArtifact?.mark || null })}>
               <span>{TOOLS[t].label}</span>
-              <em>{TOOLS[t].cost} cr</em>
+              <em>{TOOLS[t].proOnly ? 'PRO' : `${TOOLS[t].cost} cr`}</em>
             </button>
           ))}
         </div>

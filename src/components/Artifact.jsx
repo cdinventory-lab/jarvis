@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { GarmentMockup, LogoMark, TechDrawing, VectorArt, COLOR_FILLS } from '../lib/Garments.jsx';
+import { GarmentMockup, LogoMark, TechDrawing, VectorArt, COLOR_FILLS, GARMENT_PATHS } from '../lib/Garments.jsx';
+import { buildGarmentMesh, buildGlb, buildPdf, samplePathPoints } from '../lib/glb.js';
 import { Artwork } from './Artwork.jsx';
 import {
   garmentById, colorwayById, MODEL_PHOTOS, priceEstimate, TOOLS, slug, sizeChart, FABRICS, PRINTS,
@@ -7,7 +8,16 @@ import {
 
 /* ------------------------------ exports -------------------------- */
 
-export function downloadSvg(el, name = 'jarvis') {
+/** Export helpers may be handed a wrapper element — always resolve to an <svg>. */
+function asSvg(el) {
+  if (!el) return null;
+  if (el.tagName && el.tagName.toLowerCase() === 'svg') return el;
+  if (el.querySelector) return el.querySelector('svg');
+  return null;
+}
+
+export function downloadSvg(wrapper, name = 'jarvis') {
+  const el = asSvg(wrapper);
   if (!el) return;
   const clone = el.cloneNode(true);
   clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
@@ -21,7 +31,8 @@ export function downloadSvg(el, name = 'jarvis') {
   triggerDownload(URL.createObjectURL(blob), `${slug(name)}.svg`);
 }
 
-export function downloadPng(el, name = 'jarvis', scale = 2) {
+export function downloadPng(wrapper, name = 'jarvis', scale = 2) {
+  const el = asSvg(wrapper);
   if (!el) return;
   const vb = el.viewBox?.baseVal;
   const w = (vb?.width || 800) * scale;
@@ -57,6 +68,73 @@ export function downloadCsv(rows, name = 'chart') {
   triggerDownload(URL.createObjectURL(new Blob([csv], { type: 'text/csv' })), `${slug(name)}.csv`);
 }
 
+/** Serialise an SVG node into JPEG bytes (used by the PDF and GLB writers). */
+function svgToJpegBytes(wrapper, size = 1024, quality = 0.9) {
+  return new Promise((resolve) => {
+    const el = asSvg(wrapper);
+    if (!el) return resolve(null);
+    const vb = el.viewBox?.baseVal;
+    const w = vb?.width || 800;
+    const h = vb?.height || 800;
+    const scale = size / Math.max(w, h);
+    const clone = el.cloneNode(true);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', Math.round(w * scale));
+    clone.setAttribute('height', Math.round(h * scale));
+    const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    style.textContent = "text{font-family:'Space Grotesk',Helvetica,Arial,sans-serif}";
+    clone.insertBefore(style, clone.firstChild);
+
+    const svgText = new XMLSerializer().serializeToString(clone);
+    const url = URL.createObjectURL(new Blob([svgText], { type: 'image/svg+xml;charset=utf-8' }));
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(w * scale);
+      canvas.height = Math.round(h * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(async (blob) => {
+        URL.revokeObjectURL(url);
+        resolve(blob ? new Uint8Array(await blob.arrayBuffer()) : null);
+      }, 'image/jpeg', quality);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+    img.src = url;
+  });
+}
+
+/** Lay a JPEG out on paper and download it as a real PDF. */
+export async function downloadPdf(wrapper, name = 'jarvis', { a4 = true } = {}) {
+  const el = asSvg(wrapper);
+  const vb = el?.viewBox?.baseVal;
+  const width = Math.round((vb?.width || 800) * 2);
+  const height = Math.round((vb?.height || 800) * 2);
+  const jpeg = await svgToJpegBytes(el, 1600);
+  if (!jpeg) return false;
+  const pdf = buildPdf(jpeg, { width, height, a4, title: name });
+  const url = URL.createObjectURL(new Blob([pdf], { type: 'application/pdf' }));
+  triggerDownload(url, `${slug(name)}.pdf`);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return true;
+}
+
+/** Build a real glTF-binary garment from the rendered mockup and download it. */
+export async function downloadGlb(wrapper, garment = 'hoodie', name = 'jarvis-garment') {
+  const jpeg = await svgToJpegBytes(wrapper, 1024, 0.88);
+  if (!jpeg) return false;
+  const path = GARMENT_PATHS[garment] || GARMENT_PATHS.hoodie;
+  const pts = samplePathPoints(path, 160);
+  const mesh = buildGarmentMesh(pts, { thickness: 0.09 });
+  const { glb } = buildGlb(mesh, jpeg, { name: `${name} · ${garment}` });
+  const url = URL.createObjectURL(new Blob([glb], { type: 'model/gltf-binary' }));
+  triggerDownload(url, `${slug(name)}.glb`);
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+  return true;
+}
+
 function triggerDownload(href, filename) {
   const a = document.createElement('a');
   a.href = href;
@@ -77,6 +155,7 @@ export function SvgBox({ children, name, ratio = '1 / 1', bg = 'bone', className
         <div className="svgbox-tools">
           <button className="mini" onClick={() => downloadSvg(ref.current, name)}>SVG</button>
           <button className="mini" onClick={() => downloadPng(ref.current, name, 2)}>PNG</button>
+          <button className="mini" onClick={() => downloadPdf(ref.current, name)}>PDF</button>
         </div>
       )}
     </div>
@@ -153,7 +232,20 @@ export function Photoshoot({ artifact, onRefine, variant = 'photo' }) {
 export function Turntable({ artifact }) {
   const [angle, setAngle] = useState(-18);
   const [wire, setWire] = useState(false);
+  const [busy, setBusy] = useState(false);
   const drag = useRef(null);
+  const solidRef = useRef(null);
+
+  const exportGlb = async () => {
+    setBusy(true);
+    const ok = await downloadGlb(
+      solidRef.current,
+      artifact.params.garment,
+      `${artifact.params.brand}-${artifact.params.garment}`
+    );
+    setBusy(false);
+    if (!ok) window.alert('Could not render the texture for export in this browser.');
+  };
 
   const onDown = (e) => {
     drag.current = { x: e.clientX ?? e.touches?.[0]?.clientX ?? 0, a: angle };
@@ -180,13 +272,21 @@ export function Turntable({ artifact }) {
           )}
         </div>
         <div className="turntable-floor" />
+        <div className="turntable-offscreen" aria-hidden="true">
+          <div ref={solidRef}>
+            <GarmentMockup garment={artifact.params.garment} colorway={artifact.params.colorway}
+              mark={artifact.mark} placement={artifact.params.placement} scale={artifact.params.scale}
+              wash={artifact.params.wash} invert={artifact.params.invert} artSpec={artifact.art || null}
+              showShadow={false} />
+          </div>
+        </div>
       </div>
       <div className="turntable-bar">
         <span className="mono-xs">.GLB · {(angle).toFixed(0)}°</span>
         <div className="turntable-actions">
           <button className="mini" onClick={() => setWire((w) => !w)}>{wire ? 'Solid' : 'Wireframe'}</button>
           <button className="mini" onClick={() => setAngle((a) => (a > 30 ? -18 : a + 45))}>Rotate</button>
-          <span className="mono-xs dim">drag to spin</span>
+          <button className="mini" onClick={exportGlb} disabled={busy}>{busy ? 'Packing…' : 'Download .glb'}</button>
         </div>
       </div>
     </div>
@@ -195,10 +295,18 @@ export function Turntable({ artifact }) {
 
 /* --------------------------- tech pack --------------------------- */
 
+const DEFAULT_CONSTRUCTION = [
+  'Coverstitched hem and cuffs, 6 mm',
+  'Twin-needle shoulder seams with tape',
+  'Bartack at pocket and sleeve openings',
+  'Screen print cured at 160 °C',
+];
+
 export function TechPack({ artifact }) {
   const { params } = artifact;
   const g = garmentById(params.garment);
   const cw = colorwayById(params.colorway);
+  const drawingRef = useRef(null);
   const rows = ['chest', 'length', 'sleeve', 'shoulder'];
   const chart = artifact.chart && artifact.chart.length ? artifact.chart : sizeChart(params.garment, params.fit, params.unit);
   const fabric = FABRICS[params.garment] || FABRICS.hoodie;
@@ -219,7 +327,10 @@ export function TechPack({ artifact }) {
       </div>
       <div className="tp-grid">
         <div className="tp-drawing">
-          <TechDrawing garment={params.garment} printMark={artifact.mark} />
+          <div ref={drawingRef}><TechDrawing garment={params.garment} printMark={artifact.mark} /></div>
+          <button className="mini tp-pdf" type="button" onClick={() => downloadPdf(drawingRef.current, `${params.brand}-${params.garment}-techpack`, { a4: true })}>
+            PDF · A4
+          </button>
         </div>
         <div className="tp-side">
           <dl className="tp-list">
@@ -228,6 +339,7 @@ export function TechPack({ artifact }) {
             <div><dt>Fit</dt><dd>{params.fit}</dd></div>
             <div><dt>Print</dt><dd>{printLabel} · {params.placement}</dd></div>
             <div><dt>Colour</dt><dd>{cw.name}</dd></div>
+            <div><dt>Colourways</dt><dd>{(artifact.params.colourways || [cw.name, 'Bone', 'Heather grey']).join(' · ')}</dd></div>
           </dl>
           <table className="tp-table">
             <thead>
@@ -242,6 +354,14 @@ export function TechPack({ artifact }) {
               ))}
             </tbody>
           </table>
+          <div className="tp-construction">
+            <p className="mono-xs dim">CONSTRUCTION CALLOUTS</p>
+            <ol>
+              {(artifact.params.construction || DEFAULT_CONSTRUCTION).map((c, i) => (
+                <li key={c}><span className="tp-callout mono-xs">{String(i + 1).padStart(2, '0')}</span>{c}</li>
+              ))}
+            </ol>
+          </div>
           <div className="tp-bom">
             <p className="mono-xs dim">BILL OF MATERIALS</p>
             {[['Shell', 'Cotton fleece 450 GSM', '1.4 m'], ['Ribbing', '2×2 cotton rib', '0.25 m'],
@@ -373,7 +493,7 @@ export function ArtifactView({ artifact, onSelectMark, onAction, compact = false
   }
 }
 
-export function ArtifactActions({ artifact, onAction, showRefine }) {
+export function ArtifactActions({ artifact, onAction, showRefine, pro = false }) {
   const common = [];
   if (artifact.kind === 'logo') {
     common.push(
@@ -390,7 +510,10 @@ export function ArtifactActions({ artifact, onAction, showRefine }) {
       { id: 'model3d', label: '3D model' }
     );
   } else if (artifact.kind === 'photoshoot') {
-    common.push({ id: 'video', label: 'Make a 5s video' }, { id: 'vector', label: 'Vectorise print' });
+    common.push(
+      { id: 'video', label: pro ? 'Make a 5s video' : 'Make a 5s video · PRO', locked: !pro },
+      { id: 'vector', label: 'Vectorise print' }
+    );
   } else if (artifact.kind === 'art') {
     if (artifact.art?.mode === 'reference' && !artifact.art.source) {
       common.push({ id: 'upload', label: 'Choose reference image' });
@@ -408,7 +531,8 @@ export function ArtifactActions({ artifact, onAction, showRefine }) {
   return (
     <div className="artifact-actions">
       {common.map((a) => (
-        <button key={a.id} className="chip" type="button" onClick={() => onAction?.(a.id)}>{a.label}</button>
+        <button key={a.id} className={`chip ${a.locked ? 'is-locked' : ''}`} type="button"
+          onClick={() => onAction?.(a.id)}>{a.label}</button>
       ))}
       {showRefine && (
         <span className="refine-hint mono-xs dim">or type an edit below</span>
